@@ -59,18 +59,17 @@ const ObjectDetection = () => {
       webcamRef.current.video.height = myVideoHeight;
     }
   };
-  
+
   const handleVisibilityChange = () => {
     if (document.hidden) {
       if (webcamRef.current && webcamRef.current.video) {
         webcamRef.current.video.pause();
       }
+    } else {
+      if (webcamRef.current && webcamRef.current.video) {
+        webcamRef.current.video.play();
+      }
     }
-    // else {
-    // if (webcamRef.current && webcamRef.current.video) {
-    //   webcamRef.current.video.play();
-    // }
-    // }
   };
 
   useEffect(() => {
