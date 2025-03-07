@@ -1,5 +1,13 @@
 import { throttle } from "lodash";
 
+// Initialize the pause state
+let isPaused = false;
+
+// Function to update the pause state - will be called from the component
+export const updatePauseState = (paused) => {
+  isPaused = paused;
+};
+
 export const renderPredictions = (predictions, ctx) => {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
@@ -37,23 +45,16 @@ export const renderPredictions = (predictions, ctx) => {
   });
 };
 
-let isPaused = false;
+// Throttled function to play audio
 const playAudio = throttle(() => {
-  const audio = new Audio("/alert-alarm.wav");
+  if (isPaused) return;
 
-  if (!isPaused) {
-    audio.play();
+  try {
+    const audio = new Audio("/alert-alarm.wav");
+    audio.play().catch((err) => {
+      console.log("Audio play error:", err);
+    });
+  } catch (error) {
+    console.log("Error creating audio:", error);
   }
-
-  document.getElementById("pauseButton").addEventListener("click", () => {
-    audio.pause();
-    isPaused = true;
-    // audio.currentTime = 0;
-    // alert("Alarm Paused");
-  });
-
-  document.getElementById("resumeButton").addEventListener("click", () => {
-    isPaused = false;
-    // alert("Alarm Resumed");
-  });
 }, 6000);
