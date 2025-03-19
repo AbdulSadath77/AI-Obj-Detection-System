@@ -3,9 +3,17 @@ import { throttle } from "lodash";
 // Initialize the pause state
 let isPaused = false;
 
+// Initialize the selected audio output device ID
+let selectedAudioOutputDeviceId = "";
+
 // Function to update the pause state - will be called from the component
 export const updatePauseState = (paused) => {
   isPaused = paused;
+};
+
+// Function to update the selected audio output device
+export const updateAudioOutputDevice = (deviceId) => {
+  selectedAudioOutputDeviceId = deviceId;
 };
 
 export const renderPredictions = (predictions, ctx) => {
@@ -51,6 +59,21 @@ const playAudio = throttle(() => {
 
   try {
     const audio = new Audio("/alert-alarm.wav");
+
+    // Set the audio output device if supported and selected
+    if (selectedAudioOutputDeviceId && audio.setSinkId) {
+      audio
+        .setSinkId(selectedAudioOutputDeviceId)
+        .then(() => {
+          console.log(
+            `Audio output device set to: ${selectedAudioOutputDeviceId}`
+          );
+        })
+        .catch((err) => {
+          console.error("Failed to set audio output device:", err);
+        });
+    }
+
     audio.play().catch((err) => {
       console.log("Audio play error:", err);
     });

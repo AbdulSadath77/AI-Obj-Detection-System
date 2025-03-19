@@ -34,14 +34,6 @@ export default function Navbar() {
             Home
           </Link>
           <Link
-            href="/about"
-            className={`${
-              pathname === "/about" ? "text-blue-400" : "text-gray-300"
-            } hover:text-white transition-colors`}
-          >
-            About Us
-          </Link>
-          <Link
             href="/manual"
             className={`${
               pathname === "/manual" ? "text-blue-400" : "text-gray-300"
@@ -49,6 +41,15 @@ export default function Navbar() {
           >
             User Manual
           </Link>
+          <Link
+            href="/about"
+            className={`${
+              pathname === "/about" ? "text-blue-400" : "text-gray-300"
+            } hover:text-white transition-colors`}
+          >
+            About Us
+          </Link>
+
           <Link
             href="/contact"
             className={`${

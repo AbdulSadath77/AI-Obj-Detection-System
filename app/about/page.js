@@ -74,7 +74,7 @@ export default function About() {
               model for object detection
             </li>
             <li>
-              <span className="font-semibold">React Webcam:</span> For accessing
+              <span className="font-semibold">Webcam:</span> For accessing
               and displaying camera feeds
             </li>
             <li>

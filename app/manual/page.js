@@ -106,6 +106,29 @@ export default function Manual() {
                   Avoid pointing the camera directly at bright light sources
                 </li>
               </ul>
+
+              <div className="bg-gray-800 p-4 rounded-lg mb-4">
+                <h4 className="text-md font-semibold text-white mb-2">
+                  Camera Selection
+                </h4>
+                <p className="mb-2">
+                  If your device has multiple cameras, you'll see a dropdown
+                  menu above the video feed that allows you to switch between
+                  them:
+                </p>
+                <ol className="list-decimal pl-6 space-y-1">
+                  <li>Click on the dropdown menu to see available cameras</li>
+                  <li>Select the camera you wish to use</li>
+                  <li>
+                    The video feed will automatically switch to the selected
+                    camera
+                  </li>
+                </ol>
+                <p className="mt-2 text-sm text-gray-400">
+                  Note: If your device has only one camera, the selection menu
+                  will not be displayed.
+                </p>
+              </div>
             </div>
 
             <div>
@@ -230,6 +253,10 @@ export default function Manual() {
                 </li>
                 <li>Try refreshing the page</li>
                 <li>Restart your browser if the issue persists</li>
+                <li>
+                  If you have multiple cameras, try selecting a different camera
+                  from the dropdown menu
+                </li>
               </ol>
             </div>
 
@@ -285,7 +312,47 @@ export default function Manual() {
                   Try clicking anywhere on the page (some browsers require user
                   interaction before playing audio)
                 </li>
+                <li>
+                  Try selecting a different audio output device from the
+                  dropdown menu
+                </li>
               </ol>
+            </div>
+
+            <div className="bg-gray-800 p-4 rounded-lg mt-6">
+              <h3 className="text-lg font-semibold text-white mb-2">
+                Audio Output Selection
+              </h3>
+              <p className="mb-3">
+                The system allows you to choose which audio device to use for
+                alarm sounds:
+              </p>
+              <ol className="list-decimal pl-6 space-y-1 mb-3">
+                <li>
+                  Look for the "Audio Output" dropdown menu above the camera
+                  feed
+                </li>
+                <li>
+                  Select your preferred speakers or headphones from the list
+                </li>
+                <li>
+                  The system will immediately use the selected device for alarms
+                </li>
+              </ol>
+              <div className="bg-gray-700 p-3 rounded-lg text-gray-300 text-sm">
+                <p className="font-semibold mb-1">Note:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>
+                    Audio output selection requires microphone permission (for
+                    technical reasons)
+                  </li>
+                  <li>This feature may not be available in all browsers</li>
+                  <li>
+                    If you don't see the dropdown, your browser doesn't support
+                    this feature
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </section>
