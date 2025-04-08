@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import ObjectDetection from "@/components/object-detection";
+import CameraGrid from "@/components/camera-grid";
+import AnalyticsDashboard from "@/components/analytics-dashboard";
 import Link from "next/link";
 
 export default function Home() {
@@ -32,7 +33,7 @@ export default function Home() {
       </header>
 
       <div className="flex-grow w-full">
-        <ObjectDetection isPaused={isPaused} />
+        <CameraGrid isPaused={isPaused} />
       </div>
 
       <div className="flex space-x-4 mt-4">
@@ -62,6 +63,9 @@ export default function Home() {
           Resume
         </button>
       </div>
+
+      {/* Analytics Dashboard */}
+      <AnalyticsDashboard />
 
       <footer className="mt-8 p-4 text-center text-gray-500">
         <p>

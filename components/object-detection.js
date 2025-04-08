@@ -12,11 +12,11 @@ import {
 
 let detectInterval;
 
-const ObjectDetection = ({ isPaused }) => {
+const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [devices, setDevices] = useState([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState("");
+  const [selectedDeviceId, setSelectedDeviceId] = useState(deviceId || "");
   const [cameraError, setCameraError] = useState(null);
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState("");
@@ -55,12 +55,12 @@ const ObjectDetection = ({ isPaused }) => {
       );
       setDevices(videoDevices);
 
-      // Select first device by default if no device is selected
+      // Use provided deviceId or select first device by default
       if (videoDevices.length > 0 && !selectedDeviceId) {
-        setSelectedDeviceId(videoDevices[0].deviceId);
+        setSelectedDeviceId(deviceId || videoDevices[0].deviceId);
       }
     },
-    [selectedDeviceId]
+    [selectedDeviceId, deviceId]
   );
 
   // Initialize devices on mount with better permission handling and retries
@@ -539,190 +539,40 @@ const ObjectDetection = ({ isPaused }) => {
   };
 
   return (
-    <div className="mt-2 w-full">
-      {isLoading ? (
-        <div className="text-center py-16">
-          <div className="text-white animate-pulse text-xl">
-            Loading AI Model...
+    <div className="relative w-full h-full">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-10">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto"></div>
+            <p className="mt-2">Loading Camera {cameraIndex + 1}...</p>
           </div>
-          <div className="mt-4 text-gray-400 text-xs">
-            This may take a few moments depending on your connection
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center w-full">
-          {/* Device selection area */}
-          <div
-            className={`${isMobile ? "w-full px-3" : "max-w-4xl w-full"} mb-4`}
-          >
-            {/* Flex container for options */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-              {/* Camera selection dropdown */}
-              {devices.length > 1 && (
-                <div className="w-full">
-                  <label className="block text-gray-400 mb-1 text-sm">
-                    Camera Source:
-                  </label>
-                  <select
-                    className="w-full p-2 rounded-lg bg-gray-800 text-white border border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-500/20"
-                    value={selectedDeviceId}
-                    onChange={handleCameraChange}
-                  >
-                    {devices.map((device, key) => (
-                      <option value={device.deviceId} key={device.deviceId}>
-                        {device.label || `Camera ${key + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Audio output selection dropdown */}
-              {audioDevices.length > 0 &&
-                audioPermissionState === "granted" && (
-                  <div className="w-full">
-                    <label className="block text-gray-400 mb-1 text-sm">
-                      Audio Output:
-                    </label>
-                    <select
-                      className="w-full p-2 rounded-lg bg-gray-800 text-white border border-gray-600 focus:border-blue-500 focus:ring focus:ring-blue-500/20"
-                      value={selectedAudioDeviceId}
-                      onChange={handleAudioDeviceChange}
-                    >
-                      {audioDevices.map((device, key) => (
-                        <option value={device.deviceId} key={device.deviceId}>
-                          {device.label || `Audio Device ${key + 1}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-            </div>
-          </div>
-
-          {/* Audio permission message */}
-          {audioPermissionState === "denied" && (
-            <div
-              className={`${
-                isMobile ? "w-full px-3" : "max-w-4xl w-full"
-              } mb-4`}
-            >
-              <div className="bg-yellow-800/30 p-3 rounded-lg text-yellow-200 text-sm">
-                <p>
-                  Audio output selection requires microphone permission. Please
-                  enable microphone access in your browser to use this feature.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {audioPermissionState === "unsupported" && (
-            <div
-              className={`${
-                isMobile ? "w-full px-3" : "max-w-4xl w-full"
-              } mb-4`}
-            >
-              <div className="bg-gray-800/50 p-3 rounded-lg text-gray-300 text-sm">
-                <p>
-                  Your browser doesn't support audio output device selection.
-                  Default audio output will be used.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {cameraError ? (
-            <div className={`${isMobile ? "w-full px-3" : "max-w-md"}`}>
-              <div className="bg-red-900/50 rounded-xl p-8 text-center">
-                <div className="text-xl font-bold text-white mb-4">
-                  Camera Error
-                </div>
-                <div className="text-gray-200 mb-6">
-                  {cameraError === "NotReadableError" ? (
-                    <>
-                      Unable to access this camera. It might be in use by
-                      another application or the browser cannot access it.
-                    </>
-                  ) : (
-                    <>Could not start video source: {cameraError}</>
-                  )}
-                </div>
-
-                {devices.length > 1 && (
-                  <div className="text-gray-300 text-sm mb-4">
-                    Try selecting a different camera from the dropdown above.
-                  </div>
-                )}
-
-                <div className="text-gray-400 text-xs mb-4">
-                  {devices.find((d) => d.deviceId === selectedDeviceId)
-                    ?.label || "Unknown camera"}
-                </div>
-
-                <button
-                  onClick={() => {
-                    forceRestartCamera(selectedDeviceId);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div
-              className={`relative flex min-w-[300px] w-fit mx-auto justify-center items-center bg-gray-700 p-1.5 rounded-2xl overflow-hidden ${
-                isMobile ? "max-h-[80vh] max-w-full" : ""
-              }`}
-            >
-              {/* webcam */}
-              <Webcam
-                ref={webcamRef}
-                className={`rounded-xl w-full ${
-                  isMobile ? "h-auto" : "lg:h-[720px]"
-                }`}
-                videoConstraints={{
-                  deviceId: selectedDeviceId,
-                  width: { ideal: isMobile ? 720 : 1280 },
-                  height: { ideal: isMobile ? 1280 : 720 },
-                  // Use mobile-friendly aspect ratio (typically 3:4 or 9:16) for mobile
-                  aspectRatio: isMobile ? 9 / 16 : 16 / 9,
-                  frameRate: { ideal: 30 },
-                }}
-                onUserMedia={(stream) => {
-                  console.log("Camera connected successfully");
-                  setTextureErrorCount(0);
-                  setCameraError(null);
-                }}
-                onUserMediaError={(err) => {
-                  handleCameraError(err);
-                }}
-                forceScreenshotSourceSize={true}
-                imageSmoothing={true}
-                audio={false}
-                muted
-                mirrored={false}
-                screenshotFormat="image/jpeg"
-              />
-
-              {/* canvas */}
-              <canvas
-                ref={canvasRef}
-                className={`absolute top-0 left-0 z-99999 w-full ${
-                  isMobile ? "h-full" : "lg:h-[720px]"
-                }`}
-              />
-
-              {/* Status indicator */}
-              {isPaused && (
-                <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                  Alarm Paused
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
+      {cameraError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-10">
+          <div className="text-white text-center p-4">
+            <p className="text-red-500">{cameraError}</p>
+            <p className="mt-2">Camera {cameraIndex + 1}</p>
+          </div>
+        </div>
+      )}
+      <Webcam
+        ref={webcamRef}
+        audio={false}
+        width="100%"
+        height="100%"
+        screenshotFormat="image/jpeg"
+        videoConstraints={{
+          deviceId: selectedDeviceId,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        }}
+        className="w-full h-full object-cover"
+      />
+      <canvas
+        ref={canvasRef}
+        className="absolute top-0 left-0 w-full h-full"
+      />
     </div>
   );
 };

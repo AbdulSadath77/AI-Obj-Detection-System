@@ -6,9 +6,15 @@ let isPaused = false;
 // Initialize the selected audio output device ID
 let selectedAudioOutputDeviceId = "";
 
-// Function to update the pause state - will be called from the component
-export const updatePauseState = (paused) => {
-  isPaused = paused;
+// Store pause states for each camera
+const pauseStates = new Map();
+
+export const updatePauseState = (isPaused, cameraIndex = 0) => {
+  pauseStates.set(cameraIndex, isPaused);
+};
+
+export const isPaused = (cameraIndex = 0) => {
+  return pauseStates.get(cameraIndex) || false;
 };
 
 // Function to update the selected audio output device
@@ -16,7 +22,12 @@ export const updateAudioOutputDevice = (deviceId) => {
   selectedAudioOutputDeviceId = deviceId;
 };
 
-export const renderPredictions = (predictions, ctx) => {
+export const renderPredictions = (predictions, ctx, cameraIndex = 0) => {
+  // Skip rendering if this camera is paused
+  if (isPaused(cameraIndex)) {
+    return;
+  }
+
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
   // Fonts
@@ -46,6 +57,11 @@ export const renderPredictions = (predictions, ctx) => {
 
     ctx.fillStyle = "#000000";
     ctx.fillText(prediction.class, x, y);
+
+    // Update analytics if the function exists
+    if (typeof window !== 'undefined' && window.updateDetectionStats) {
+      window.updateDetectionStats(prediction);
+    }
 
     if (isPerson) {
       playAudio();
