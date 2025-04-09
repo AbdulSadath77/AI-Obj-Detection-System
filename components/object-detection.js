@@ -9,10 +9,11 @@ import {
   updatePauseState,
   updateAudioOutputDevice,
 } from "@/utils/render-predictions";
+import { addToHistory } from "@/utils/memory-bank";
 
 let detectInterval;
 
-const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
+const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0, userId, sensitivity = 0.6 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [devices, setDevices] = useState([]);
@@ -148,16 +149,16 @@ const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
     if (!initialLoadComplete) {
       const storedPauseState = sessionStorage.getItem("alarmPaused");
       if (storedPauseState !== null) {
-        updatePauseState(storedPauseState === "true");
+        updatePauseState(storedPauseState === "true", cameraIndex);
       }
       setInitialLoadComplete(true);
     }
-  }, [initialLoadComplete]);
+  }, [initialLoadComplete, cameraIndex]);
 
   // Update the pause state in the render-predictions module whenever isPaused changes
   useEffect(() => {
-    updatePauseState(isPaused);
-  }, [isPaused]);
+    updatePauseState(isPaused, cameraIndex);
+  }, [isPaused, cameraIndex]);
 
   // Get available audio output devices
   const handleAudioDevices = React.useCallback(
@@ -222,70 +223,107 @@ const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
     updateAudioOutputDevice(newAudioDeviceId);
   };
 
-  async function runCoco() {
-    setIsLoading(true); // Set loading state to true when model loading starts
-    try {
-      const net = await cocoSSDLoad();
-      setIsLoading(false); // Set loading state to false when model loading completes
+  // Initialize TensorFlow model
+  useEffect(() => {
+    let isCancel = false;
+    let model = null;
+    let animationFrameId = null;
 
-      detectInterval = setInterval(() => {
-        runObjectDetection(net);
-      }, 10);
-    } catch (error) {
-      console.error("Error loading model:", error);
-      setIsLoading(false);
-    }
-  }
-
-  async function runObjectDetection(net) {
-    // Skip if we're still loading or in the process of switching cameras
-    if (isLoading) return;
-
-    try {
-      if (
-        canvasRef.current &&
-        webcamRef.current !== null &&
-        webcamRef.current.video?.readyState === 4
-      ) {
-        // Check if video dimensions are valid
-        const videoWidth = webcamRef.current.video.videoWidth;
-        const videoHeight = webcamRef.current.video.videoHeight;
-
-        if (videoWidth === 0 || videoHeight === 0) {
-          // Skip detection if video dimensions are not valid
-          return;
+    const loadModel = async () => {
+      // Load model
+      try {
+        model = await cocoSSDLoad();
+        if (!isCancel) {
+          setIsLoading(false);
         }
-
-        canvasRef.current.width = videoWidth;
-        canvasRef.current.height = videoHeight;
-
-        try {
-          // find detected objects
-          const detectedObjects = await net.detect(
-            webcamRef.current.video,
-            undefined,
-            0.6
-          );
-
-          if (canvasRef.current) {
-            // Check again before drawing in case component unmounted
-            const context = canvasRef.current.getContext("2d");
-            renderPredictions(detectedObjects, context);
-          }
-        } catch (error) {
-          console.error("Detection error:", error);
-          // If we get texture errors repeatedly, it might indicate we need to restart detection
-          if (error.message && error.message.includes("texture size")) {
-            console.log("Texture error detected, attempting recovery...");
-            incrementTextureError();
-          }
+      } catch (err) {
+        console.error("Error loading model:", err);
+        if (!isCancel) {
+          setCameraError("Failed to load AI model. Please refresh the page.");
+          setIsLoading(false);
         }
       }
-    } catch (outerError) {
-      console.error("Outer detection error:", outerError);
-      // If the outer try fails, it's likely a more serious error with the webcam element
+    };
+
+    loadModel();
+
+    // Detect objects
+    const detectObjects = async () => {
+      if (model === null || isCancel) return;
+      if (
+        webcamRef.current === null ||
+        webcamRef.current.video === null ||
+        webcamRef.current.video.readyState !== 4
+      )
+        return;
+
+      try {
+        const video = webcamRef.current.video;
+        const canvas = canvasRef.current;
+
+        if (!video || !canvas) return;
+
+        // Get video properties
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+
+        // Set canvas width & height to match video
+        canvas.width = videoWidth;
+        canvas.height = videoHeight;
+
+        // Make predictions with the configured sensitivity
+        const predictions = await model.detect(video, 20, sensitivity);
+        
+        // Add camera index to predictions for analytics
+        const predictionsWithCameraIndex = predictions.map(prediction => ({
+          ...prediction,
+          cameraIndex
+        }));
+
+        // Store detection in user history if it's significant
+        if (userId && predictions.length > 0) {
+          // Only store person detections with high confidence
+          const significantDetections = predictions.filter(p => 
+            (p.class === 'person' && p.score > sensitivity) || p.score > 0.8
+          );
+          
+          if (significantDetections.length > 0) {
+            // Add to user history
+            significantDetections.forEach(detection => {
+              addToHistory(userId, {
+                ...detection,
+                cameraIndex,
+                deviceId,
+                timestamp: new Date().toISOString()
+              });
+            });
+          }
+        }
+
+        // Get the current camera index and pass it to renderPredictions
+        renderPredictions(predictionsWithCameraIndex, canvas.getContext("2d"), cameraIndex);
+      } catch (error) {
+        console.log("Detection error:", error);
+      }
+      
+      // Continue detection loop
+      if (!isCancel) {
+        animationFrameId = requestAnimationFrame(detectObjects);
+      }
+    };
+
+    // Start detection loop once model is loaded
+    if (!isLoading && model) {
+      detectObjects();
     }
-  }
+
+    return () => {
+      isCancel = true;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [cameraIndex, isLoading, sensitivity, deviceId, userId]);
 
   const showmyVideo = () => {
     if (
@@ -346,16 +384,9 @@ const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
   useEffect(() => {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    runCoco();
     showmyVideo();
 
     return () => {
-      // Clear any running intervals
-      if (detectInterval) {
-        clearInterval(detectInterval);
-        detectInterval = null;
-      }
-
       // Remove event listeners
       document.removeEventListener("visibilitychange", handleVisibilityChange);
 
@@ -404,14 +435,76 @@ const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
           }
         }
 
-        runCoco();
+        // Initialize TensorFlow model
+        let isCancel = false;
+        let model = null;
+
+        const loadModel = async () => {
+          // Load model
+          try {
+            model = await cocoSSDLoad();
+            if (!isCancel) {
+              setIsLoading(false);
+            }
+          } catch (err) {
+            console.error("Error loading model:", err);
+            if (!isCancel) {
+              setCameraError("Failed to load AI model. Please refresh the page.");
+              setIsLoading(false);
+            }
+          }
+        };
+
+        loadModel();
+
+        // Detect objects
+        const detectObjects = async () => {
+          if (model === null || isCancel) return;
+          if (
+            webcamRef.current === null ||
+            webcamRef.current.video === null ||
+            webcamRef.current.video.readyState !== 4
+          )
+            return;
+
+          try {
+            const video = webcamRef.current.video;
+            const canvas = canvasRef.current;
+
+            if (!video || !canvas) return;
+
+            // Get video properties
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+
+            // Set canvas width & height to match video
+            canvas.width = videoWidth;
+            canvas.height = videoHeight;
+
+            // Make predictions
+            const predictions = await model.detect(video);
+            
+            // Add camera index to predictions for analytics
+            const predictionsWithCameraIndex = predictions.map(prediction => ({
+              ...prediction,
+              cameraIndex
+            }));
+
+            // Get the current camera index and pass it to renderPredictions
+            renderPredictions(predictionsWithCameraIndex, canvas.getContext("2d"), cameraIndex);
+          } catch (error) {
+            console.log("Detection error:", error);
+          }
+        };
+
+        detectObjects();
       }, 1500); // Even longer delay for OBS virtual cameras
 
       return () => {
         clearTimeout(switchTimer);
       };
     }
-  }, [selectedDeviceId]);
+  }, [selectedDeviceId, cameraIndex]);
 
   // Handle camera errors and fallback
   const handleCameraError = (error) => {
@@ -492,11 +585,74 @@ const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
       setIsLoading(true);
 
       setTimeout(() => {
-        runCoco();
+        // Initialize TensorFlow model
+        let isCancel = false;
+        let model = null;
+
+        const loadModel = async () => {
+          // Load model
+          try {
+            model = await cocoSSDLoad();
+            if (!isCancel) {
+              setIsLoading(false);
+            }
+          } catch (err) {
+            console.error("Error loading model:", err);
+            if (!isCancel) {
+              setCameraError("Failed to load AI model. Please refresh the page.");
+              setIsLoading(false);
+            }
+          }
+        };
+
+        loadModel();
+
+        // Detect objects
+        const detectObjects = async () => {
+          if (model === null || isCancel) return;
+          if (
+            webcamRef.current === null ||
+            webcamRef.current.video === null ||
+            webcamRef.current.video.readyState !== 4
+          )
+            return;
+
+          try {
+            const video = webcamRef.current.video;
+            const canvas = canvasRef.current;
+
+            if (!video || !canvas) return;
+
+            // Get video properties
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+
+            // Set canvas width & height to match video
+            canvas.width = videoWidth;
+            canvas.height = videoHeight;
+
+            // Make predictions
+            const predictions = await model.detect(video);
+            
+            // Add camera index to predictions for analytics
+            const predictionsWithCameraIndex = predictions.map(prediction => ({
+              ...prediction,
+              cameraIndex
+            }));
+
+            // Get the current camera index and pass it to renderPredictions
+            renderPredictions(predictionsWithCameraIndex, canvas.getContext("2d"), cameraIndex);
+          } catch (error) {
+            console.log("Detection error:", error);
+          }
+        };
+
+        detectObjects();
+
         setTextureErrorCount(0);
       }, 2000);
     }
-  }, [textureErrorCount]);
+  }, [textureErrorCount, cameraIndex]);
 
   // Recovery function that can be called in the detection error handler
   const incrementTextureError = () => {
@@ -527,7 +683,69 @@ const ObjectDetection = ({ isPaused, deviceId, cameraIndex = 0 }) => {
           // Short delay before restarting
           setTimeout(() => {
             // Restart detection
-            runCoco();
+            // Initialize TensorFlow model
+            let isCancel = false;
+            let model = null;
+
+            const loadModel = async () => {
+              // Load model
+              try {
+                model = await cocoSSDLoad();
+                if (!isCancel) {
+                  setIsLoading(false);
+                }
+              } catch (err) {
+                console.error("Error loading model:", err);
+                if (!isCancel) {
+                  setCameraError("Failed to load AI model. Please refresh the page.");
+                  setIsLoading(false);
+                }
+              }
+            };
+
+            loadModel();
+
+            // Detect objects
+            const detectObjects = async () => {
+              if (model === null || isCancel) return;
+              if (
+                webcamRef.current === null ||
+                webcamRef.current.video === null ||
+                webcamRef.current.video.readyState !== 4
+              )
+                return;
+
+              try {
+                const video = webcamRef.current.video;
+                const canvas = canvasRef.current;
+
+                if (!video || !canvas) return;
+
+                // Get video properties
+                const videoWidth = video.videoWidth;
+                const videoHeight = video.videoHeight;
+
+                // Set canvas width & height to match video
+                canvas.width = videoWidth;
+                canvas.height = videoHeight;
+
+                // Make predictions
+                const predictions = await model.detect(video);
+                
+                // Add camera index to predictions for analytics
+                const predictionsWithCameraIndex = predictions.map(prediction => ({
+                  ...prediction,
+                  cameraIndex
+                }));
+
+                // Get the current camera index and pass it to renderPredictions
+                renderPredictions(predictionsWithCameraIndex, canvas.getContext("2d"), cameraIndex);
+              } catch (error) {
+                console.log("Detection error:", error);
+              }
+            };
+
+            detectObjects();
           }, 1000);
         })
         .catch((err) => {

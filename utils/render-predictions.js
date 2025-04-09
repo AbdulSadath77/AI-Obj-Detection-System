@@ -1,7 +1,7 @@
 import { throttle } from "lodash";
 
 // Initialize the pause state
-let isPaused = false;
+let isGlobalPaused = false;
 
 // Initialize the selected audio output device ID
 let selectedAudioOutputDeviceId = "";
@@ -11,6 +11,7 @@ const pauseStates = new Map();
 
 export const updatePauseState = (isPaused, cameraIndex = 0) => {
   pauseStates.set(cameraIndex, isPaused);
+  isGlobalPaused = isPaused; // Keep the global state in sync for backward compatibility
 };
 
 export const isPaused = (cameraIndex = 0) => {
@@ -71,7 +72,7 @@ export const renderPredictions = (predictions, ctx, cameraIndex = 0) => {
 
 // Throttled function to play audio
 const playAudio = throttle(() => {
-  if (isPaused) return;
+  if (isGlobalPaused) return;
 
   try {
     const audio = new Audio("/alert-alarm.wav");
